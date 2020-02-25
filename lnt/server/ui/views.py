@@ -1,4 +1,5 @@
 from __future__ import print_function
+import base64
 import datetime
 import logging
 import os
@@ -672,12 +673,17 @@ def v4_git_search():
 @v4_route("/git/<sha>", methods=('GET', 'POST'))
 def v4_git_sha(sha):
     def get_gerrit_for_sha(_sha):
-        url = ('http://review.couchbase.org/changes/?q={}&o=ALL_REVISIONS&o='
-               'ALL_COMMITS&o=WEB_LINKS'.format(_sha))
+        use_auth = os.getenv('GERRIT_USER') and os.getenv('GERRIT_PASSWORD')
+        root = 'http://review.couchbase.org/' if not use_auth else 'http://review.couchbase.org/a/'
+        url = '{}changes/?q={}&o=ALL_REVISIONS&o=ALL_COMMITS&o=WEB_LINKS'.format(root, _sha)
+        request = urllib2.Request(url)
+        if use_auth:
+            basic_auth = base64.b64encode('{}:{}'.format(os.getenv('GERRIT_USER'), os.getenv('GERRIT_PASSWORD')))
+            request.add_header('Authorization', 'Basic {}'.format(basic_auth))
 
         try:
             response = urllib2.urlopen(url).read()
-        except:
+        except Exception:
             abort(404)
 
         start_index = response.index('{')

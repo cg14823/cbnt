@@ -204,12 +204,17 @@ class CouchbaseTest(builtintest.BuiltinTest):
             'commit': os.environ.get('GERRIT_PATCHSET_REVISION')}
 
         if all(required_variables.values()):
-            url = ('http://review.couchbase.org/changes/{project}~{branch}~'
-                   '{change_id}/revisions/{commit}/commit'
-                   .format(**required_variables))
+            use_auth = os.getenv('GERRIT_USER') and os.getenv('GERRIT_PASSWORD')
+            root = 'http://review.couchbase.org/' if not use_auth else 'http://review.couchbase.org/a/'
+            url = root + 'changes/{project}~{branch}~{change_id}/revisions/{commit}/commit'.format(**required_variables)
+            request = urllib2.Request(url)
+            if use_auth:
+                basic_auth = base64.b64encode('{}:{}'.format(os.getenv('GERRIT_USER'), os.getenv('GERRIT_PASSWORD')))
+                request.add_header('Authorization', 'Basic {}'.format(basic_auth))
+
             note('getting parent commit from {}'.format(url))
             try:
-                response = urllib2.urlopen(url).read()
+                response = urllib2.urlopen(request).read()
             except Exception:
                 fatal('failed to get parent commit from {}')
                 raise

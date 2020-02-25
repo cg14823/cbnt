@@ -5,6 +5,7 @@ These are a bit magical because the models themselves are driven by the test
 suite metadata, so we only create the classes at runtime.
 """
 
+import base64
 import datetime
 import json
 import os
@@ -1057,12 +1058,18 @@ class TestSuiteDB(object):
     def _getOrCreateGerrit(self, order, run_parameters, cv=False):
 
         def get_gerrit_id_for_sha(sha):
-            url = 'http://review.couchbase.org/changes/{}'.format(sha)
+            use_auth = os.getenv('GERRIT_USER') and os.getenv('GERRIT_PASSWORD')
+            root = 'http://review.couchbase.org/' if not use_auth else 'http://review.couchbase.org/a/'
+            url = '{}changes/{}'.format(root, sha)
+            request = urllib2.Request(url)
+            if use_auth:
+                basic_auth = base64.b64encode('{}:{}'.format(os.getenv('GERRIT_USER'), os.getenv('GERRIT_PASSWORD')))
+                request.add_header('Authorization', 'Basic {}'.format(basic_auth))
 
             try:
-                response = urllib2.urlopen(url).read()
-            except Exception:
-                fatal('failed to get parent commit from {}')
+                response = urllib2.urlopen(request).read()
+            except Exception as e:
+                fatal('failed to get parent commit from {}: {}'.format(url, e))
                 raise
 
             start_index = response.index('{')
